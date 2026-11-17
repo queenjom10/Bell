@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>جرس التحدّي | Quiz Buzzer</title>
+    <style>
+        /* =========================================================
+           1. المتغيرات والأساسيات (العمل بدون إنترنت بالكامل)
+           ========================================================= */
+        :root {
+            --bg-main: #0b1120;
+            --bg-card: #151e32;
+            --bg-elevated: #1e293b;
+            --border-subtle: rgba(255, 255, 255, 0.1);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            
+            /* ألوان المتسابقة الأولى (الأزرق) */
+            --blue-light: #3b82f6;
+            --blue-main: #2563eb;
+            --blue-dark: #1d4ed8;
+            --blue-shadow: #1e3a8a;
+            
+            /* ألوان المتسابقة الثانية (الأحمر) */
+            --red-light: #f43f5e;
+            --red-main: #e11d48;
+            --red-dark: #be123c;
+            --red-shadow: #881337;
+
+            /* ألوان التمييز والتحكم */
+            --accent-gold: #f59e0b;
+            --accent-emerald: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            /* خط عربي نظامي أنيق وواضح يعمل على Safari/iPad بدون إنترنت */
+            font-family: -apple-system, BlinkMacSystemFont, "SF Arabic", "Segoe UI", Tahoma, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            touch-action: manipulation;
+            overflow-x: hidden;
+        }
+
+        .app-container {
+            min-height: 100vh;
+            min-height: 100dvh;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 14px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        /* =========================================================
+           2. الهيدر ولوحة المؤقت وأزرار التحكم
+           ========================================================= */
+        .header-bar {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 24px;
+            padding: 14px 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        }
+
+        .brand-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, #fbbf24, #d97706);
+            color: #0b1120;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 16px rgba(245, 158, 11, 0.3);
+            flex-shrink: 0;
+        }
+
+        .brand-title {
+            font-size: 1.5rem;
+            font-weight: 900;
+            line-height: 1.15;
+            color: var(--text-primary);
+        }
+
+        .brand-subtitle {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+        }
+
+        /* صندوق المؤقت التنازلي (60 ثانية) */
+        .timer-box {
+            background-color: var(--bg-main);
+            border: 2px solid var(--border-subtle);
+            border-radius: 20px;
+            padding: 8px 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-width: 145px;
+        }
+
+        .timer-label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+        }
+
+        .timer-value {
+            font-size: 2.6rem;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+            line-height: 1.05;
+            color: #fbbf24;
+            transition: color 0.2s ease, transform 0.2s ease;
+        }
+
+        .timer-value.warning {
+            color: #fb7185;
+            animation: pulseWarning 0.6s infinite;
+        }
+
+        @keyframes pulseWarning {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        /* أزرار المنظّمة */
+        .controls-group {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ctrl-btn {
+            border: none;
+            border-radius: 16px;
+            padding: 12px 18px;
+            font-size: 0.98rem;
+            font-weight: 800;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: transform 0.1s ease, opacity 0.2s ease, background-color 0.2s ease;
+            touch-action: manipulation;
+        }
+
+        .ctrl-btn:active:not(:disabled) {
+            transform: scale(0.96);
+        }
+
+        .ctrl-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #06281e;
+            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.28);
+        }
+
+        .btn-reset {
+            background-color: var(--bg-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .btn-reset:hover:not(:disabled) {
+            background-color: #293548;
+        }
+
+        .btn-sound {
+            background-color: var(--bg-elevated);
+            color: #fbbf24;
+            border: 1px solid var(--border-subtle);
+            padding: 12px 14px;
+        }
+
+        .btn-sound.muted {
+            color: var(--text-secondary);
+        }
+
+        /* =========================================================
+           3. منطقة إعلان الفائزة بالضغط وشريط التقدم (ثانيتان)
+           ========================================================= */
+        .announcement-banner {
+            background-color: var(--bg-card);
+            border: 2px solid var(--border-subtle);
+            border-radius: 24px;
+            padding: 16px 24px;
+            min-height: 106px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.25s ease;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        }
+
+        .announcement-banner.state-ready {
+            background: linear-gradient(180deg, rgba(16, 185, 129, 0.14), rgba(21, 30, 50, 0.95));
+            border-color: rgba(16, 185, 129, 0.55);
+        }
+
+        .announcement-banner.state-win-1 {
+            background: linear-gradient(180deg, rgba(37, 99, 235, 0.32), rgba(21, 30, 50, 0.98));
+            border-color: #60a5fa;
+            box-shadow: 0 0 35px rgba(37, 99, 235, 0.35);
+        }
+
+        .announcement-banner.state-win-2 {
+            background: linear-gradient(180deg, rgba(225, 29, 72, 0.32), rgba(21, 30, 50, 0.98));
+            border-color: #fb7185;
+            box-shadow: 0 0 35px rgba(225, 29, 72, 0.35);
+        }
+
+        .announcement-banner.state-ended {
+            background: linear-gradient(180deg, rgba(245, 158, 11, 0.22), rgba(21, 30, 50, 0.98));
+            border-color: #fbbf24;
+        }
+
+        .status-sub {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .status-main {
+            font-size: clamp(1.5rem, 3.2vw, 2.5rem);
+            font-weight: 900;
+            color: var(--text-primary);
+            line-height: 1.2;
+        }
+
+        /* شريط العد التنازلي لإعادة التفعيل التلقائي (2000 مللي ثانية) */
+        .relock-bar-wrapper {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 7px;
+            background-color: rgba(255, 255, 255, 0.08);
+            display: none;
+        }
+
+        .relock-bar-wrapper.active {
+            display: block;
+        }
+
+        .relock-bar-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #fbbf24, #fde047);
+            transform-origin: right center;
+        }
+
+        @keyframes shrinkProgress {
+            from { transform: scaleX(1); }
+            to { transform: scaleX(0); }
+        }
+
+        /* =========================================================
+           4. منطقة زري الجرسين للمتسابقتين (متجاوبة للآيباد)
+           ========================================================= */
+        .buzzers-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px;
+            min-height: 300px;
+        }
+
+        /* التكيف التلقائي في الوضع الرأسي (Portrait) */
+        @media (max-width: 768px) and (orientation: portrait) {
+            .buzzers-grid {
+                grid-template-columns: 1fr;
+            }
+            .header-bar {
+                justify-content: center;
+                text-align: center;
+            }
+        }
+
+        .buzzer-button {
+            width: 100%;
+            height: 100%;
+            min-height: 220px;
+            border: none;
+            border-radius: 32px;
+            padding: 24px;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            cursor: pointer;
+            position: relative;
+            /* منع إيماءات المتصفح لضمان تسجيل اللمسة في 0ms */
+            touch-action: none;
+            transition: transform 0.07s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease, opacity 0.2s ease, box-shadow 0.07s ease;
+        }
+
+        /* زر المتسابقة الأولى - الأزرق */
+        .buzzer-blue {
+            background: linear-gradient(145deg, var(--blue-light), var(--blue-dark));
+            box-shadow: 0 14px 0 var(--blue-shadow), 0 22px 40px rgba(37, 99, 235, 0.35);
+        }
+
+        .buzzer-blue:not(:disabled):active {
+            transform: translateY(10px) scale(0.985);
+            box-shadow: 0 4px 0 var(--blue-shadow), 0 10px 20px rgba(37, 99, 235, 0.4);
+        }
+
+        /* زر المتسابقة الثانية - الأحمر */
+        .buzzer-red {
+            background: linear-gradient(145deg, var(--red-light), var(--red-dark));
+            box-shadow: 0 14px 0 var(--red-shadow), 0 22px 40px rgba(225, 29, 72, 0.35);
+        }
+
+        .buzzer-red:not(:disabled):active {
+            transform: translateY(10px) scale(0.985);
+            box-shadow: 0 4px 0 var(--red-shadow), 0 10px 20px rgba(225, 29, 72, 0.4);
+        }
+
+        /* حالة قفل الأزرار */
+        .buzzer-button:disabled {
+            opacity: 0.38;
+            filter: grayscale(50%);
+            cursor: not-allowed;
+            transform: translateY(8px);
+            box-shadow: 0 6px 0 #1e293b;
+        }
+
+        /* تمييز المتسابقة الفائزة خلال مهلة الثانيتين */
+        .buzzer-button.winner-highlight {
+            opacity: 1 !important;
+            filter: none !important;
+            transform: scale(1.015) !important;
+            outline: 5px solid #fde047;
+            box-shadow: 0 0 45px rgba(253, 224, 71, 0.55), 0 10px 0 #854d0e !important;
+        }
+
+        .buzzer-icon-circle {
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.16);
+            border: 2px solid rgba(255, 255, 255, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .buzzer-name {
+            font-size: clamp(1.75rem, 3.4vw, 2.75rem);
+            font-weight: 900;
+            text-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+        }
+
+        .buzzer-hint {
+            font-size: 0.95rem;
+            font-weight: 700;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 6px 18px;
+            border-radius: 999px;
+            color: rgba(255, 255, 255, 0.9);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <!-- 1. الهيدر والعناصر العلوية -->
+        <header class="header-bar">
+            <!-- عنوان الموقع -->
+            <div class="brand-box">
+                <div class="brand-icon" aria-hidden="true">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="brand-title">جرس التحدّي</h1>
+                    <p class="brand-subtitle">Quiz Buzzer</p>
+                </div>
+            </div>
+
+            <!-- مؤقت تنازلي 60 ثانية -->
+            <div class="timer-box" aria-live="polite">
+                <span class="timer-label">الوقت المتبقي</span>
+                <div id="timerDisplay" class="timer-value">60</div>
+            </div>
+
+            <!-- أزرار التحكم للمنظّمة -->
+            <div class="controls-group">
+                <button id="startBtn" type="button" class="ctrl-btn btn-start">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    <span>ابدئي الجولة – 60 ثانية</span>
+                </button>
+
+                <button id="resetBtn" type="button" class="ctrl-btn btn-reset">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                        <path d="M3 3v5h5"/>
+                    </svg>
+                    <span>إعادة الجولة</span>
+                </button>
+
+                <button id="soundBtn" type="button" class="ctrl-btn btn-sound" aria-label="التحكم بالصوت" title="تشغيل أو كتم الصوت">
+                    <!-- أيقونة الصوت مفعّل -->
+                    <svg id="iconSoundOn" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                    </svg>
+                    <!-- أيقونة الصوت مكتوم -->
+                    <svg id="iconSoundOff" style="display: none;" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                        <line x1="23" y1="9" x2="17" y2="15"/>
+                        <line x1="17" y1="9" x2="23" y2="15"/>
+                    </svg>
+                    <span id="soundLabel">الصوت: يعمل</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- 2. منطقة إعلان الفائزة بالضغط وحالة الجولة -->
+        <section id="announcementBanner" class="announcement-banner" aria-live="assertive">
+            <div id="statusSub" class="status-sub">بانتظار إشارة البدء من المنظّمة</div>
+            <div id="statusMain" class="status-main">اضغطي «ابدئي الجولة – 60 ثانية» للبدء</div>
+            
+            <!-- شريط تقدم مدته ثانيتان يظهر عند قفل الأزرار -->
+            <div id="relockBarWrapper" class="relock-bar-wrapper">
+                <div id="relockBarFill" class="relock-bar-fill"></div>
+            </div>
+        </section>
+
+        <!-- 3. زرا الجرسين للمتسابقتين -->
+        <main class="buzzers-grid">
+            <!-- زر المتسابقة الأولى (الأزرق) -->
+            <button id="buzzer1" type="button" class="buzzer-button buzzer-blue" disabled>
+                <div class="buzzer-icon-circle" aria-hidden="true">
+                    <svg width="46" height="46" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                    </svg>
+                </div>
+                <span class="buzzer-name">المتسابقة الأولى</span>
+                <span id="hint1" class="buzzer-hint">مقفل بانتظار بدء الجولة</span>
+            </button>
+
+            <!-- زر المتسابقة الثانية (الأحمر) -->
+            <button id="buzzer2" type="button" class="buzzer-button buzzer-red" disabled>
+                <div class="buzzer-icon-circle" aria-hidden="true">
+                    <svg width="46" height="46" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                    </svg>
+                </div>
+                <span class="buzzer-name">المتسابقة الثانية</span>
+                <span id="hint2" class="buzzer-hint">مقفل بانتظار بدء الجولة</span>
+            </button>
+        </main>
+
+    </div>
+
+    <script>
+        /* =========================================================
+           1. متغيرات الحالة والثوابت
+           ========================================================= */
+        const ROUND_DURATION = 60;      // مدة الجولة ثابتة: 60 ثانية
+        const LOCK_DURATION_MS = 2000;  // مدة قفل الزرين بعد الضغط: ثانيتان (2000 مللي ثانية)
+
+        let timeLeft = ROUND_DURATION;
+        let roundTimerId = null;
+        let relockTimeoutId = null;
+        let isRoundActive = false;
+        let isBuzzerOpen = false;
+        let isSoundEnabled = true;
+
+        // مراجع عناصر الواجهة
+        const timerDisplay = document.getElementById('timerDisplay');
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const soundBtn = document.getElementById('soundBtn');
+        const iconSoundOn = document.getElementById('iconSoundOn');
+        const iconSoundOff = document.getElementById('iconSoundOff');
+        const soundLabel = document.getElementById('soundLabel');
+
+        const announcementBanner = document.getElementById('announcementBanner');
+        const statusSub = document.getElementById('statusSub');
+        const statusMain = document.getElementById('statusMain');
+        const relockBarWrapper = document.getElementById('relockBarWrapper');
+        const relockBarFill = document.getElementById('relockBarFill');
+
+        const buzzer1 = document.getElementById('buzzer1');
+        const buzzer2 = document.getElementById('buzzer2');
+        const hint1 = document.getElementById('hint1');
+        const hint2 = document.getElementById('hint2');
+
+        /* =========================================================
+           2. محرك الصوت المدمج (Web Audio API) بدون ملفات خارجية
+           ========================================================= */
+        let audioCtx = null;
+
+        function ensureAudioContext() {
+            if (!audioCtx) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) {
+                    audioCtx = new AudioCtx();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // صوت تنبيه مميز لكل متسابقة عند الضغط
+        function playPlayerBuzzTone(playerNumber) {
+            if (!isSoundEnabled) return;
+            try {
+                ensureAudioContext();
+                if (!audioCtx) return;
+
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                if (playerNumber === 1) {
+                    // نغمة المتسابقة الأولى (نغمة صافية مرتفعة)
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, now); // C5
+                    osc.frequency.exponentialRampToValueAtTime(783.99, now + 0.14); // G5
+                } else {
+                    // نغمة المتسابقة الثانية (نغمة مميزة مختلفة التردد)
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(659.25, now); // E5
+                    osc.frequency.exponentialRampToValueAtTime(987.77, now + 0.14); // B5
+                }
+
+                gain.gain.setValueAtTime(0.45, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.45);
+            } catch (e) {
+                // تجاهل أي قيود صوتية في المتصفح بصمت
+            }
+        }
+
+        // نغمة تنبيه خفيفة للثواني الخمس الأخيرة
+        function playCountdownTick() {
+            if (!isSoundEnabled) return;
+            try {
+                ensureAudioContext();
+                if (!audioCtx) return;
+
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, now);
+
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } catch (e) {}
+        }
+
+        // صافرة لطيفة عند انتهاء الـ 60 ثانية
+        function playRoundEndWhistle() {
+            if (!isSoundEnabled) return;
+            try {
+                ensureAudioContext();
+                if (!audioCtx) return;
+
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, now); // D5
+                osc.frequency.linearRampToValueAtTime(440.00, now + 0.25); // A4
+                osc.frequency.linearRampToValueAtTime(349.23, now + 0.6); // F4
+
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(now);
+                osc.stop(now + 0.65);
+            } catch (e) {}
+        }
+
+        /* =========================================================
+           3. التحكم في الواجهة وحالات الجرس
+           ========================================================= */
+        function updateTimerDisplay() {
+            timerDisplay.textContent = String(timeLeft).padStart(2, '0');
+            if (isRoundActive && timeLeft <= 5 && timeLeft > 0) {
+                timerDisplay.classList.add('warning');
+            } else {
+                timerDisplay.classList.remove('warning');
+            }
+        }
+
+        function setReadyState() {
+            if (!isRoundActive || timeLeft <= 0) return;
+
+            isBuzzerOpen = true;
+            buzzer1.disabled = false;
+            buzzer2.disabled = false;
+            buzzer1.classList.remove('winner-highlight');
+            buzzer2.classList.remove('winner-highlight');
+
+            hint1.textContent = 'اضغطي هنا للإجابة';
+            hint2.textContent = 'اضغطي هنا للإجابة';
+
+            announcementBanner.className = 'announcement-banner state-ready';
+            statusSub.textContent = 'الجولة جارية — استعدوا للسؤال';
+            statusMain.textContent = 'استعدوا! الجرس مفتوح';
+
+            relockBarWrapper.classList.remove('active');
+            relockBarFill.style.animation = 'none';
+        }
+
+        function triggerRelockProgressBar() {
+            relockBarWrapper.classList.add('active');
+            relockBarFill.style.animation = 'none';
+            // إجبار المتصفح على إعادة حساب التنسيق لإعادة تشغيل الأنيميشن بدقة
+            void relockBarFill.offsetWidth;
+            relockBarFill.style.animation = `shrinkProgress ${LOCK_DURATION_MS}ms linear forwards`;
+        }
+
+        /* =========================================================
+           4. معالجة ضغطة الجرس (استجابة لحظية عبر pointerdown)
+           ========================================================= */
+        function handleBuzzerPress(playerNumber, event) {
+            if (event) {
+                event.preventDefault();
+            }
+
+            // لا تُسجّل الضغطة إلا إذا كانت الجولة جارية والأزرار مفتوحة
+            if (!isRoundActive || !isBuzzerOpen || timeLeft <= 0) {
+                return;
+            }
+
+            // 1. قفل الزرين فوراً لمنع تسجيل أي ضغطة ثانية أثناء القفل
+            isBuzzerOpen = false;
+            buzzer1.disabled = true;
+            buzzer2.disabled = true;
+
+            // 2. تشغيل نغمة التنبيه الخاصة بالمتسابقة
+            playPlayerBuzzTone(playerNumber);
+
+            // 3. إعلان اسم المتسابقة التي ضغطت أولاً وتمييز زرها
+            const winnerName = playerNumber === 1 ? 'المتسابقة الأولى' : 'المتسابقة الثانية';
+            const winnerButton = playerNumber === 1 ? buzzer1 : buzzer2;
+
+            winnerButton.classList.add('winner-highlight');
+            hint1.textContent = 'مقفل مؤقتاً (ثانيتان)...';
+            hint2.textContent = 'مقفل مؤقتاً (ثانيتان)...';
+
+            announcementBanner.className = playerNumber === 1
+                ? 'announcement-banner state-win-1'
+                : 'announcement-banner state-win-2';
+            statusSub.textContent = 'أول من ضغط — فرصة الإجابة لـ:';
+            statusMain.textContent = winnerName;
+
+            // 4. تشغيل شريط العد التنازلي وإعادة التفعيل التلقائي بعد ثانيتين (2000 مللي ثانية)
+            triggerRelockProgressBar();
+
+            clearTimeout(relockTimeoutId);
+            relockTimeoutId = setTimeout(() => {
+                // إعادة فتح الزرين تلقائياً بشرط أن الجولة لا تزال نشطة والوقت لم ينتهِ
+                if (isRoundActive && timeLeft > 0) {
+                    setReadyState();
+                }
+            }, LOCK_DURATION_MS);
+        }
+
+        // ربط أحداث pointerdown السريعة بالزرين
+        buzzer1.addEventListener('pointerdown', (e) => handleBuzzerPress(1, e));
+        buzzer2.addEventListener('pointerdown', (e) => handleBuzzerPress(2, e));
+
+        /* =========================================================
+           5. إدارة دورة حياة الجولة (البدء، النهاية، الإعادة، الصوت)
+           ========================================================= */
+        function startRound() {
+            if (isRoundActive) return;
+
+            ensureAudioContext();
+
+            // إذا كان المؤقت قد وصل للصفر سابقاً، نعيده لـ 60 ثانية
+            if (timeLeft <= 0) {
+                timeLeft = ROUND_DURATION;
+            }
+
+            isRoundActive = true;
+            startBtn.disabled = true;
+            updateTimerDisplay();
+            setReadyState();
+
+            clearInterval(roundTimerId);
+            roundTimerId = setInterval(() => {
+                timeLeft -= 1;
+                updateTimerDisplay();
+
+                if (timeLeft <= 5 && timeLeft > 0) {
+                    playCountdownTick();
+                }
+
+                if (timeLeft <= 0) {
+                    finishRound();
+                }
+            }, 1000);
+        }
+
+        function finishRound() {
+            clearInterval(roundTimerId);
+            clearTimeout(relockTimeoutId);
+
+            isRoundActive = false;
+            isBuzzerOpen = false;
+            timeLeft = 0;
+            updateTimerDisplay();
+
+            buzzer1.disabled = true;
+            buzzer2.disabled = true;
+            buzzer1.classList.remove('winner-highlight');
+            buzzer2.classList.remove('winner-highlight');
+
+            hint1.textContent = 'انتهت الجولة';
+            hint2.textContent = 'انتهت الجولة';
+
+            relockBarWrapper.classList.remove('active');
+            relockBarFill.style.animation = 'none';
+
+            announcementBanner.className = 'announcement-banner state-ended';
+            statusSub.textContent = 'توقف استقبال الإجابات تلقائياً';
+            statusMain.textContent = 'انتهت الجولة! انتهى وقت الـ 60 ثانية';
+
+            // إبقاء زر البدء مقفلاً حتى تضغط المنظمة "إعادة الجولة" أو السماح بإعادة البدء
+            startBtn.disabled = false;
+            playRoundEndWhistle();
+        }
+
+        function resetRound() {
+            clearInterval(roundTimerId);
+            clearTimeout(relockTimeoutId);
+
+            isRoundActive = false;
+            isBuzzerOpen = false;
+            timeLeft = ROUND_DURATION;
+            updateTimerDisplay();
+
+            buzzer1.disabled = true;
+            buzzer2.disabled = true;
+            buzzer1.classList.remove('winner-highlight');
+            buzzer2.classList.remove('winner-highlight');
+
+            hint1.textContent = 'مقفل بانتظار بدء الجولة';
+            hint2.textContent = 'مقفل بانتظار بدء الجولة';
+
+            relockBarWrapper.classList.remove('active');
+            relockBarFill.style.animation = 'none';
+
+            announcementBanner.className = 'announcement-banner';
+            statusSub.textContent = 'بانتظار إشارة البدء من المنظّمة';
+            statusMain.textContent = 'اضغطي «ابدئي الجولة – 60 ثانية» للبدء';
+
+            startBtn.disabled = false;
+        }
+
+        function toggleSound() {
+            isSoundEnabled = !isSoundEnabled;
+            if (isSoundEnabled) {
+                ensureAudioContext();
+                iconSoundOn.style.display = 'inline';
+                iconSoundOff.style.display = 'none';
+                soundLabel.textContent = 'الصوت: يعمل';
+                soundBtn.classList.remove('muted');
+            } else {
+                iconSoundOn.style.display = 'none';
+                iconSoundOff.style.display = 'inline';
+                soundLabel.textContent = 'الصوت: مكتوم';
+                soundBtn.classList.add('muted');
+            }
+        }
+
+        // ربط أزرار التحكم بالأحداث
+        startBtn.addEventListener('click', startRound);
+        resetBtn.addEventListener('click', resetRound);
+        soundBtn.addEventListener('click', toggleSound);
+
+        // التهيئة الأولية عند فتح الصفحة
+        updateTimerDisplay();
+    </script>
+</body>
+</html>
